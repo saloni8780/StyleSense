@@ -12,6 +12,7 @@ import Lookbook         from "../components/Lookbook.jsx";
 import WardrobeManager  from "../components/WardrobeManager.jsx";
 import WardrobeStyleResult from "../components/WardrobeStyleResult.jsx";
 import SavedOutfits     from "../components/SavedOutfits.jsx";
+import StylistChat from "../components/StylistChat.jsx";
 import { getStyling }   from "../api";
 
 const STEPS = [
@@ -23,6 +24,7 @@ const STEPS = [
 
 const PAGE_TITLES = {
   style:         { title: "Style Advisor",       subtitle: "Tell me the occasion and budget — I'll style it for you." },
+  chat:          { title: "AI Stylist Chat",     subtitle: "Chat with your stylist — ask anything, follow up, get styled." },
   weather:       { title: "Weather Styling",      subtitle: "Real weather for your city, outfit advice that actually makes sense." },
   ways:          { title: "Ways to Style",         subtitle: "Enter clothes you own — get AI-generated outfit variations." },
   compatibility: { title: "Compatibility Score",  subtitle: "Describe your outfit — get a score across 5 dimensions with explanations." },
@@ -136,6 +138,7 @@ export default function Dashboard() {
           )}
 
           {active === "weather"       && <WeatherStyle />}
+          {active === "chat"          && <StylistChat />}
           {active === "ways"          && <StyleGrid />}
           {active === "compatibility" && <CompatibilityScore />}
           {active === "lookbook"      && <Lookbook />}

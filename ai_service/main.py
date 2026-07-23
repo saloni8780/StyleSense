@@ -28,6 +28,7 @@ from agents.llm_providers import get_vision_response
 from agents.style_grid import generate_style_grid
 from agents.wardrobe_agent import run_wardrobe_style
 from agents.weather_agent import get_weather_styling
+from agents.chat.graph import chat_graph
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
@@ -135,6 +136,10 @@ class CompatibilityRequest(BaseModel):
     occasion: str = Field(default="general", max_length=200)
     season: str = Field(default="Summer", max_length=50)
     extra_notes: str = Field(default="", max_length=1_000)
+class ChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=1_000)
+    session_id: str = Field(min_length=1, max_length=100)
+    wardrobe_items: list[dict] = Field(default_factory=list)
 
 
 @app.post("/api/style")
@@ -224,3 +229,16 @@ def compatibility_score(request: CompatibilityRequest):
 @app.get("/health")
 def health():
     return {"status": "ok", "cloudinary": _cloudinary_ready}
+
+@app.post("/api/chat")
+def chat(request: ChatRequest):
+    try:
+        result = chat_graph.invoke(
+            {"message": request.message, "wardrobe_items": request.wardrobe_items},
+            config={"configurable": {"thread_id": request.session_id}},
+        )
+        return {"reply": result["reply"], "products": result.get("shopping_output") or []}
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=502, detail=str(exc)) from exc

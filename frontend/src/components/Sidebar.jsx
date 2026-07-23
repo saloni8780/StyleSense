@@ -6,6 +6,7 @@ const NAV = [
     group: "Styling",
     items: [
       { id: "style",         icon: "✦", label: "Style Advisor",      locked: false },
+      { id: "chat",          icon: "💬", label: "AI Stylist Chat",     locked: false },
       { id: "weather",       icon: "☁", label: "Weather Styling",     locked: false },
       { id: "ways",          icon: "◈", label: "Ways to Style",        locked: false },
       { id: "compatibility", icon: "◎", label: "Compatibility Score",  locked: false },
