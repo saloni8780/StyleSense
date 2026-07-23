@@ -2,22 +2,25 @@
 llm_providers.py
 
 Text:   Groq (Llama 3.3 70B) — styling advice
-Vision: Groq (Llama 4 Scout) — lookbook image feedback
+Vision: Gemini (gemini-flash-latest) — lookbook image feedback
+        (Groq deprecated both of its vision models — Llama 4 Scout
+        and Maverick — in 2026, with no free-tier vision replacement)
 Image:  Hugging Face FLUX.1-schnell — outfit inspiration image
-
-All on free tiers, no Google needed.
 """
 import os
-import base64
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
 from groq import Groq
+import google.generativeai as genai
+import PIL.Image
 
-GROQ_MODEL        = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+genai.configure(api_key=os.getenv("GOOGLE_AI_STUDIO_KEY"))
 
 _groq_llm    = None
 _groq_client = None
+_gemini_vision_model = None
 
 
 def _groq():
@@ -34,6 +37,13 @@ def _groq_client_instance():
     return _groq_client
 
 
+def _gemini_vision():
+    global _gemini_vision_model
+    if _gemini_vision_model is None:
+        _gemini_vision_model = genai.GenerativeModel("gemini-flash-latest")
+    return _gemini_vision_model
+
+
 def get_text_response(prompt: str) -> str:
     """Fast text generation via Groq Llama 3.3."""
     response = _groq().invoke([HumanMessage(content=prompt)])
@@ -42,27 +52,9 @@ def get_text_response(prompt: str) -> str:
 
 def get_vision_response(prompt: str, image_paths: list[str]) -> str:
     """
-    Lookbook coordination feedback via Groq Llama 4 Scout (vision).
-    Same GROQ_API_KEY — no extra setup needed.
+    Lookbook coordination feedback via Gemini Vision.
+    Requires GOOGLE_AI_STUDIO_KEY in .env.
     """
-    client = _groq_client_instance()
-
-    # Build content with images as base64
-    content = []
-    for path in image_paths:
-        with open(path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode("utf-8")
-        content.append({
-            "type": "image_url",
-            "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
-        })
-
-    # Add text prompt last
-    content.append({"type": "text", "text": prompt})
-
-    response = client.chat.completions.create(
-        model=GROQ_VISION_MODEL,
-        messages=[{"role": "user", "content": content}],
-        max_tokens=500,
-    )
-    return response.choices[0].message.content
+    images = [PIL.Image.open(p) for p in image_paths]
+    response = _gemini_vision().generate_content([prompt, *images])
+    return response.text
