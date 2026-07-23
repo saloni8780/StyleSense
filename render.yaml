@@ -1,0 +1,72 @@
+# render.yaml — defines both backend services so Render can auto-deploy them.
+# Docs: https://render.com/docs/blueprint-spec
+#
+# HOW TO USE:
+# 1. Push this repo to GitHub.
+# 2. Go to render.com → New → Blueprint → connect the repo.
+# 3. Render reads this file and creates both services automatically.
+# 4. Add the secret env vars (API keys, DB URL) manually in each service's
+#    Environment tab — never commit real keys.
+
+services:
+
+  # ── FastAPI AI service ────────────────────────────────────────────
+  - type: web
+    name: stylesense-ai
+    runtime: python
+    rootDir: ai_service
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false             # set manually in Render dashboard
+      - key: GOOGLE_AI_STUDIO_KEY
+        sync: false
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        sync: false
+      - key: GOOGLE_CLOUD_PROJECT
+        sync: false
+      - key: GOOGLE_CLOUD_LOCATION
+        value: asia-south1
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false             # set to your Vercel URL e.g. https://stylesense.vercel.app
+
+  # ── Django + DRF backend ──────────────────────────────────────────
+  - type: web
+    name: stylesense-django
+    runtime: python
+    rootDir: backend_django
+    buildCommand: pip install -r requirements.txt && python manage.py migrate
+    startCommand: gunicorn stylesense.wsgi:application --bind 0.0.0.0:$PORT
+    plan: free
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true     # Render generates a random secret key automatically
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_ALLOWED_HOSTS
+        sync: false             # set to your Render URL e.g. stylesense-django.onrender.com
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stylesense-db
+          property: connectionString
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false             # set to your Vercel + ai_service URLs
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+
+databases:
+  - name: stylesense-db
+    plan: free
+    databaseName: stylesense

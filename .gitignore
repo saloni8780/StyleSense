@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+node_modules/
+dist/
+.faiss_index/
+.scrape_cache/
+db.sqlite3
+media/
+*.egg-info/
+.DS_Store
+gcp-service-account.json
+SETUP.md
