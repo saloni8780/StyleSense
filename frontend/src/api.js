@@ -1,5 +1,5 @@
-const AI_BASE     = import.meta.env.VITE_AI_API_BASE     || "http://localhost:8005";
-const DJANGO_BASE = import.meta.env.VITE_DJANGO_API_BASE || "http://localhost:8000";
+const AI_BASE     = import.meta.env.VITE_AI_API_BASE     || "http://localhost:8001";
+const DJANGO_BASE = import.meta.env.VITE_DJANGO_API_BASE || "http://localhost:8005";
 
 // ---------- helpers ----------
 function authHeader() {
