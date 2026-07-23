@@ -2,8 +2,8 @@
 
 A multi-agent AI web application that acts as a personal fashion stylist.
 Describe an occasion, get grounded styling advice, live shopping links,
-weather-aware outfit suggestions, wardrobe memory, and coordination feedback
-all from a single platform.
+weather-aware outfit suggestions, wardrobe memory, coordination feedback,
+and now a conversational AI Stylist Chat — all from a single platform.
 
 ---
 
@@ -20,7 +20,8 @@ graph TD
 
     D --> PG[(PostgreSQL<br/>Render / local)]
 
-    F --> LG[LangGraph Pipeline]
+    F --> LG[Style Advisor Pipeline<br/>LangGraph]
+    F --> CG[AI Stylist Chat<br/>LangGraph]
     F --> WA[Weather Agent]
     F --> SG[Style Grid Agent]
     F --> CS[Compatibility Agent]
@@ -29,9 +30,13 @@ graph TD
 
     LG --> N1[1 · RAG Retrieval<br/>FAISS + sentence-transformers]
     LG --> N2[2 · Groq LLM<br/>Llama 3.3 70B]
-    LG --> N3[3 · Scraper<br/>BeautifulSoup]
+    LG --> N3[3 · Scraper<br/>Search-link fallback]
     LG --> N4[4 · Image Gen<br/>Pollinations.ai]
     LG --> N5[5 · Compose<br/>Final result]
+
+    CG --> CN1[Planner Node<br/>extracts intent + needs]
+    CN1 --> CN2[RAG / Weather / Wardrobe /<br/>Shopping / Compatibility<br/>— only needed nodes, in parallel]
+    CN2 --> CN3[Compose Node<br/>reply + product links]
 
     N1 --> KB[(Knowledge Base<br/>color_theory.md<br/>silhouette_guide.md<br/>jewellery_pairing.md)]
     N3 --> SC[Flipkart · Amazon<br/>Myntra · Ajio]
@@ -43,6 +48,7 @@ graph TD
     style D fill:#2E2238,color:#F6EFE4
     style PG fill:#B8924F,color:#fff
     style LG fill:#3D2B50,color:#F6EFE4
+    style CG fill:#3D2B50,color:#F6EFE4
     style KB fill:#4A3560,color:#F6EFE4
 ```
 
@@ -54,7 +60,7 @@ flowchart LR
 
     R[RAG Node<br/>FAISS vector search<br/>styling knowledge base]
     --> G[Groq Node<br/>Llama 3.3 70B<br/>styling tips + queries]
-    --> S[Scraper Node<br/>BeautifulSoup<br/>Flipkart · Amazon]
+    --> S[Scraper Node<br/>Search-link fallback<br/>Flipkart · Amazon · Myntra · Ajio]
     --> I[Image Node<br/>Pollinations.ai<br/>outfit inspiration]
     --> C[Compose Node<br/>tips + products + image]
 
@@ -66,6 +72,61 @@ flowchart LR
     style I fill:#2E2238,color:#F6EFE4
     style C fill:#B05D68,color:#fff
 ```
+
+### LangGraph Pipeline (AI Stylist Chat) 
+
+The chat graph decides its own path per message: a planner node extracts intent and a `needs`
+dict, a conditional edge routes to only the relevant agent nodes, and
+those run concurrently before converging on a single composed reply.
+
+```mermaid
+flowchart TB
+    IN([User message<br/>+ wardrobe_items]) --> P
+
+    P[Planner Node<br/>Groq LLM<br/>extracts occasion, city, budget,<br/>style_pref, outfit_description, needs]
+
+    P -->|needs.rag| RAG[RAG Node<br/>rag.py]
+    P -->|needs.weather| WX[Weather Node<br/>weather_agent.py]
+    P -->|needs.wardrobe| WD[Wardrobe Node<br/>wardrobe_agent.py]
+    P -->|needs.shopping| SH[Shopping Node<br/>scraper/fallback.py]
+    P -->|needs.compatibility| CP[Compatibility Node<br/>compatibility_agent.py]
+
+    RAG --> CO
+    WX --> CO
+    WD --> CO
+    SH --> CO
+    CP --> CO
+
+    CO[Compose Node<br/>Groq LLM<br/>combines all outputs<br/>into one natural reply]
+    CO --> OUT([reply + products<br/>back to React chat panel])
+
+    style P fill:#3D2B50,color:#F6EFE4
+    style RAG fill:#C97B84,color:#fff
+    style WX fill:#C97B84,color:#fff
+    style WD fill:#C97B84,color:#fff
+    style SH fill:#C97B84,color:#fff
+    style CP fill:#C97B84,color:#fff
+    style CO fill:#B05D68,color:#fff
+```
+
+Nodes return only the state keys they changed (not the full state) —
+required because LangGraph rejects concurrent writes to the same key
+from parallel branches ([`INVALID_CONCURRENT_GRAPH_UPDATE`](https://python.langchain.com/docs/troubleshooting/errors/INVALID_CONCURRENT_GRAPH_UPDATE)).
+
+**Multi-turn memory :** the graph is compiled with a
+`MemorySaver` checkpointer, keyed by a `session_id` generated once per
+browser session and sent with every message as `thread_id`. The
+planner node is prompted with what's already known from earlier turns
+and only overwrites a field when the new message actually mentions it
+— so "make it from my wardrobe" after "I have an interview tomorrow in
+Bangalore" keeps the occasion and city instead of losing them.
+
+**Not yet implemented in chat:** a clarify branch for missing required
+fields (e.g. asking for a city if weather is needed but none was
+given), and a vision/lookbook node (needs an image-upload control in
+the chat UI first). Also note `MemorySaver` is in-process only — it
+won't survive a server restart or multiple workers; a Postgres-backed
+checkpointer would be needed for that.
 
 ### Auth Flow
 
@@ -84,6 +145,12 @@ sequenceDiagram
     R->>D: GET /api/wardrobe/ + Authorization: Token xxx
     D-->>R: Wardrobe items
 
+    Note over U,R: AI Stylist Chat — reuses the wardrobe call,<br/>adds a stable session_id per browser session
+    R->>D: GET /api/wardrobe/ (via getWardrobe())
+    D-->>R: Wardrobe items
+    R->>F: POST /api/chat { message, session_id, wardrobe_items }
+    Note right of F: session_id used as thread_id —<br/>MemorySaver restores prior turns' state
+
     Note over U,R: Guest mode
     U->>R: Continue as guest
     R->>R: localStorage.setItem(ss_guest, true)
@@ -97,14 +164,15 @@ sequenceDiagram
 | Feature | What it does |
 |---|---|
 | **Style Advisor** | Enter occasion + budget → 5-node LangGraph pipeline runs RAG retrieval → Groq LLM → scraper → outfit cards with Amazon / Flipkart / Myntra / Ajio links |
+| **AI Stylist Chat** | Chat naturally instead of filling a form — a planner node reads intent and routes to only the relevant agents (RAG, weather, wardrobe, shopping, compatibility), which run in parallel and are composed into one reply with product links. Remembers context across turns via a LangGraph checkpointer, so follow-ups don't need to repeat the occasion, city, or budget |
 | **Weather-aware Styling** | Enter city → live weather from wttr.in → Groq builds outfit advice around real temperature, humidity, conditions |
 | **Ways to Style** | Enter clothing items → Groq plans variations → Pollinations.ai generates images in parallel → styled grid |
 | **Compatibility Score** | Describe outfit → scored across Color Harmony / Occasion Fit / Formality / Accessories / Season with reason per dimension + one fix |
 | **Lookbook Feedback** | Upload outfit photos → Gemini Vision returns coordination verdict, observations, single concrete fix |
-| **My Wardrobe** | Add clothing items by name / category / colour → stored in Django → referenced in all wardrobe-aware features |
+| **My Wardrobe** | Add clothing items by name / category / colour → stored in Django → referenced in all wardrobe-aware features, including chat |
 | **Style from Wardrobe** | Enter occasion → AI builds outfits from what you own first → flags missing piece with shop links |
 | **Saved Outfits** | Save any styling result → collapsible cards with full note + product links + saved date |
-| **Auth** | Register / login / guest mode → DRF token auth → guest gets 5 features, logged-in gets all 8 |
+| **Auth** | Register / login / guest mode → DRF token auth → guest gets 5 features, logged-in gets all 9 |
 
 ---
 
@@ -117,17 +185,17 @@ sequenceDiagram
 ### AI & GenAI
 | Tool | Usage |
 |---|---|
-| LangGraph | 5-node agent pipeline: RAG → Groq → Scraper → Image → Compose |
+| LangGraph | Style Advisor: fixed 5-node pipeline (RAG → Groq → Scraper → Image → Compose). AI Stylist Chat: planner + conditional multi-agent routing graph |
 | LangChain | RAG chain: DirectoryLoader → RecursiveCharacterTextSplitter → HuggingFaceEmbeddings → FAISS |
-| Groq (Llama 3.3 70B) | Styling advice, wardrobe planning, weather outfits, style grid variations, input cleaning |
+| Groq (Llama 3.3 70B) | Styling advice, wardrobe planning, weather outfits, style grid variations, chat planner + composer |
 | Groq Vision (Llama 4 Scout) | Lookbook photo coordination feedback |
 | RAG | 3 curated knowledge base docs: color_theory.md, silhouette_guide.md, jewellery_pairing.md |
-| Prompt Engineering | JSON-structured outputs with fallback parsing across all 6 AI endpoints |
+| Prompt Engineering | JSON-structured outputs with fallback parsing across all AI endpoints, including the chat planner and composer |
 
 ### Frameworks
-- FastAPI — AI microservice (6 endpoints, async)
+- FastAPI — AI microservice (7 endpoints, async — including `/api/chat`)
 - Django + DRF — auth, wardrobe, saved outfits, PostgreSQL models
-- React + Vite (or Lovable) — 8-section dashboard + landing page
+- React + Vite (or Lovable) — 9-section dashboard + landing page
 
 ### Web Technologies
 - Three.js — 3D rotating palette swatch hero (local version)
@@ -135,7 +203,7 @@ sequenceDiagram
 - HTML / CSS / Tailwind
 
 ### Tools & Libraries
-- BeautifulSoup — Flipkart + Amazon scraper with graceful fallback
+- BeautifulSoup — Flipkart + Amazon scraper (kept for reference; both the Style Advisor pipeline and the chat's shopping node use the more reliable search-link fallback instead)
 - Pandas — scrape result deduplication and price sorting
 - Git — version control
 - Postman — API collection at `infra/StyleSense.postman_collection.json`
@@ -160,22 +228,28 @@ sequenceDiagram
 ```
 stylesense/
 ├── ai_service/                  FastAPI AI microservice
-│   ├── main.py                  6 endpoints
+│   ├── main.py                  7 endpoints, incl. /api/chat
 │   ├── agents/
-│   │   ├── graph.py             LangGraph 5-node pipeline
+│   │   ├── graph.py             LangGraph 5-node pipeline (Style Advisor)
 │   │   ├── rag.py               FAISS RAG retrieval
 │   │   ├── llm_providers.py     Groq + Gemini wrappers
 │   │   ├── image_gen.py         Pollinations image generation
 │   │   ├── wardrobe_agent.py    Wardrobe-aware styling agent
 │   │   ├── weather_agent.py     wttr.in + Groq weather styling
 │   │   ├── style_grid.py        Parallel image grid generation
-│   │   └── compatibility_agent.py  5-dimension outfit scorer
+│   │   ├── compatibility_agent.py  5-dimension outfit scorer
+│   │   └── chat/                AI Stylist Chat
+│   │       ├── state.py         ChatState schema
+│   │       ├── nodes.py         planner, rag, weather, wardrobe,
+│   │       │                    shopping, compatibility, compose nodes
+│   │       └── graph.py         conditional-routing LangGraph
 │   ├── scraper/
 │   │   ├── base.py              Session, cache, rate limiting
 │   │   ├── flipkart_scraper.py  BeautifulSoup scraper
 │   │   ├── amazon_scraper.py    BeautifulSoup scraper
 │   │   ├── myntra_scraper.py    JS-rendered — returns search link
-│   │   └── fallback.py          Pandas cleanup + search link generator
+│   │   └── fallback.py          Search-link generator (used by both
+│   │                            Style Advisor and chat's shopping node)
 │   └── knowledge_base/
 │       ├── color_theory.md
 │       ├── silhouette_guide.md
@@ -195,11 +269,12 @@ stylesense/
 │   └── src/
 │       ├── pages/
 │       │   ├── Landing.jsx      Dark hero + auth card + guest mode
-│       │   └── Dashboard.jsx    Sidebar + 8 feature sections
+│       │   └── Dashboard.jsx    Sidebar + 9 feature sections
 │       └── components/
 │           ├── Sidebar.jsx
 │           ├── StyleForm.jsx
 │           ├── OutfitTagGrid.jsx
+│           ├── StylistChat.jsx        AI Stylist Chat panel
 │           ├── WeatherStyle.jsx
 │           ├── StyleGrid.jsx
 │           ├── CompatibilityScore.jsx
@@ -208,9 +283,6 @@ stylesense/
 │           ├── WardrobeStyleResult.jsx
 │           └── SavedOutfits.jsx
 │
-├── infra/
-│   ├── README.md                AWS deployment notes
-│   └── StyleSense.postman_collection.json
 │
 ├── render.yaml                  Auto-deploys both services on Render
 ├── .env.example                 All keys documented with where to get them
@@ -281,6 +353,9 @@ Open **http://localhost:5173** (or 5174 if 5173 is taken).
 
 | Limitation | Reason | Extension path |
 |---|---|---|
+| Chat memory is in-process only | `MemorySaver` checkpointer doesn't persist across server restarts or multiple workers | Swap in a Postgres-backed checkpointer (Django already has Postgres) |
+| Chat doesn't ask for missing info | No clarify branch yet — planner works with whatever's in the single message | Add a conditional edge from the planner to a clarify node when required fields (e.g. city for weather) are absent |
+| Chat has no photo/Lookbook path | `StylistChat.jsx` has no image upload control | Add an upload control to the chat panel and a vision node to `chat/graph.py` |
 | Myntra scraping returns search link | JS-rendered SPA, can't scrape statically | Add Playwright headless browser |
 | Image generation sometimes fails | Pollinations.ai free tier rate limits | Switch to Stability AI or pay tier |
 | Lookbook vision uses daily quota | Gemini AI Studio free tier | Add billing to GCP account |
@@ -291,6 +366,8 @@ Open **http://localhost:5173** (or 5174 if 5173 is taken).
 
 ## Future Scope
 
+- **Persistent chat memory** — swap the in-process `MemorySaver` for a Postgres-backed checkpointer so conversations survive server restarts
+- **Chat clarifying questions** — ask for missing city/occasion/budget instead of guessing
 - **Personal Style Memory** — learn preferences over time, increasingly personalized recommendations
 - **AI Closet Scan** — upload wardrobe photo, Gemini Vision auto-detects and categorises items
 - **Smart Shopping Assistant** — analyse how well a new item matches existing wardrobe before buying
