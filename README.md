@@ -108,11 +108,6 @@ flowchart TB
     style CP fill:#C97B84,color:#fff
     style CO fill:#B05D68,color:#fff
 ```
-
-Nodes return only the state keys they changed (not the full state) —
-required because LangGraph rejects concurrent writes to the same key
-from parallel branches ([`INVALID_CONCURRENT_GRAPH_UPDATE`](https://python.langchain.com/docs/troubleshooting/errors/INVALID_CONCURRENT_GRAPH_UPDATE)).
-
 **Multi-turn memory :** the graph is compiled with a
 `MemorySaver` checkpointer, keyed by a `session_id` generated once per
 browser session and sent with every message as `thread_id`. The
