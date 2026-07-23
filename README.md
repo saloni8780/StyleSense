@@ -121,12 +121,6 @@ and only overwrites a field when the new message actually mentions it
 — so "make it from my wardrobe" after "I have an interview tomorrow in
 Bangalore" keeps the occasion and city instead of losing them.
 
-**Not yet implemented in chat:** a clarify branch for missing required
-fields (e.g. asking for a city if weather is needed but none was
-given), and a vision/lookbook node (needs an image-upload control in
-the chat UI first). Also note `MemorySaver` is in-process only — it
-won't survive a server restart or multiple workers; a Postgres-backed
-checkpointer would be needed for that.
 
 ### Auth Flow
 
