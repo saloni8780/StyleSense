@@ -198,7 +198,7 @@ sequenceDiagram
 - React + Vite (or Lovable) — 9-section dashboard + landing page
 
 ### Web Technologies
-- Three.js — 3D rotating palette swatch hero (local version)
+- React — component-based UI, hooks (useState, useEffect, useRef) for state and session handling
 - REST API — all frontend-to-backend communication
 - HTML / CSS / Tailwind
 
