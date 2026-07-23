@@ -280,7 +280,6 @@ stylesense/
 │
 ├── render.yaml                  Auto-deploys both services on Render
 ├── .env.example                 All keys documented with where to get them
-└── SETUP.md                     Local setup walkthrough
 ```
 
 ---
