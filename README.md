@@ -118,28 +118,29 @@ Bangalore" keeps the occasion and city instead of losing them.
 
 
 ### Auth Flow
-
+ 
 ```mermaid
 sequenceDiagram
     actor U as User
     participant R as React
     participant D as Django DRF
-
+    participant F as FastAPI
+ 
     U->>R: Enter username + password
     R->>D: POST /api/auth/login/
     D-->>R: { token, username }
     R->>R: localStorage.setItem(ss_token)
-
+ 
     Note over U,R: Every subsequent request
     R->>D: GET /api/wardrobe/ + Authorization: Token xxx
     D-->>R: Wardrobe items
-
+ 
     Note over U,R: AI Stylist Chat — reuses the wardrobe call,<br/>adds a stable session_id per browser session
     R->>D: GET /api/wardrobe/ (via getWardrobe())
     D-->>R: Wardrobe items
     R->>F: POST /api/chat { message, session_id, wardrobe_items }
     Note right of F: session_id used as thread_id —<br/>MemorySaver restores prior turns' state
-
+ 
     Note over U,R: Guest mode
     U->>R: Continue as guest
     R->>R: localStorage.setItem(ss_guest, true)
