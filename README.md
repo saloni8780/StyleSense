@@ -330,10 +330,10 @@ Open **http://localhost:5173** (or 5174 if 5173 is taken).
 
 ## API Keys Needed (all free, no credit card)
 
-| Key | Where to get | Time |
+| Key | Where to get | 
 |---|---|---|
-| `GROQ_API_KEY` | console.groq.com | 1 min |
-| `GOOGLE_AI_STUDIO_KEY` | aistudio.google.com/apikey | 1 min |
-| `CLOUDINARY_*` | cloudinary.com → Dashboard | 2 min |
+| `GROQ_API_KEY` | console.groq.com | 
+| `GOOGLE_AI_STUDIO_KEY` | aistudio.google.com/apikey | 
+| `CLOUDINARY_*` | cloudinary.com → Dashboard | 
 
 ---
