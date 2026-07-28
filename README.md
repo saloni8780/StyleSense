@@ -178,7 +178,7 @@ sequenceDiagram
 | LangGraph | Style Advisor: fixed 5-node pipeline (RAG → Groq → Scraper → Image → Compose). AI Stylist Chat: planner + conditional multi-agent routing graph |
 | LangChain | RAG chain: DirectoryLoader → RecursiveCharacterTextSplitter → HuggingFaceEmbeddings → FAISS |
 | Groq (Llama 3.3 70B) | Styling advice, wardrobe planning, weather outfits, style grid variations, chat planner + composer |
-| Groq Vision (Llama 4 Scout) | Lookbook photo coordination feedback |
+| Gemini Vision (`gemini-flash-latest`) | Lookbook photo coordination feedback — switched from Groq's Llama 4 Scout/Maverick after Groq deprecated both in 2026 with no free-tier vision replacement |
 | RAG | 3 curated knowledge base docs: color_theory.md, silhouette_guide.md, jewellery_pairing.md |
 | Prompt Engineering | JSON-structured outputs with fallback parsing across all AI endpoints, including the chat planner and composer |
 
@@ -330,10 +330,10 @@ Open **http://localhost:5173** (or 5174 if 5173 is taken).
 
 ## API Keys Needed (all free, no credit card)
 
-| Key | Where to get | Time |
-|---|---|---|
-| `GROQ_API_KEY` | console.groq.com | 1 min |
-| `GOOGLE_AI_STUDIO_KEY` | aistudio.google.com/apikey | 1 min |
-| `CLOUDINARY_*` | cloudinary.com → Dashboard | 2 min |
+| Key | Where to get | 
+|---|---|
+| `GROQ_API_KEY` | console.groq.com | 
+| `GOOGLE_AI_STUDIO_KEY` | aistudio.google.com/apikey | 
+| `CLOUDINARY_*` | cloudinary.com → Dashboard | 
 
 ---
