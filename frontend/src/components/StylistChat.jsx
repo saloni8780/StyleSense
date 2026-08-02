@@ -18,7 +18,7 @@ export default function StylistChat() {
       let wardrobeItems = [];
       try { wardrobeItems = await getWardrobe(); } catch {}
 
-      const res = await fetch("http://localhost:8001/api/chat", {
+      const res = await fetch(`${AI_BASE}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
